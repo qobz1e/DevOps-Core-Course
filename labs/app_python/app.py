@@ -6,184 +6,135 @@ DevOps Info Service
 import os
 import socket
 import platform
-import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from flask import Flask, jsonify, request
 
-# Настройка логирования
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
-
-# Создание приложения Flask
+# Создаем приложение Flask
 app = Flask(__name__)
 
-# Конфигурация
+# Настройки из переменных окружения
 HOST = os.getenv('HOST', '0.0.0.0')
 PORT = int(os.getenv('PORT', 5000))
 DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
 
-# Время запуска приложения
+# Время запуска сервиса
 START_TIME = datetime.now(timezone.utc)
 
+# Добавляем Docker информацию
+IS_DOCKER = os.path.exists('/.dockerenv')
+CONTAINER_ID = socket.gethostname() if IS_DOCKER else None
 
-def get_system_info() -> dict:
-    """
-    Сбор информации о системе
+def get_uptime():
+    """Рассчитывает время работы сервиса"""
+    delta = datetime.now(timezone.utc) - START_TIME
+    seconds = int(delta.total_seconds())
     
-    Returns:
-        dict: Информация о системе
-    """
+    hours = seconds // 3600
+    minutes = (seconds % 3600) // 60
+    secs = seconds % 60
+    
+    parts = []
+    if hours > 0:
+        parts.append(f"{hours} hour{'s' if hours != 1 else ''}")
+    if minutes > 0:
+        parts.append(f"{minutes} minute{'s' if minutes != 1 else ''}")
+    if secs > 0 or not parts:
+        parts.append(f"{secs} second{'s' if secs != 1 else ''}")
+    
     return {
+        'seconds': seconds,
+        'human': ', '.join(parts)
+    }
+
+@app.route('/')
+def main_endpoint():
+    """Основной эндпоинт - информация о сервисе и системе"""
+    
+    # Получаем информацию о системе
+    system_info = {
         'hostname': socket.gethostname(),
         'platform': platform.system(),
         'platform_version': platform.version(),
         'architecture': platform.machine(),
         'cpu_count': os.cpu_count(),
-        'python_version': platform.python_version()
+        'python_version': platform.python_version(),
+        'is_docker_container': IS_DOCKER,
+        'container_id': CONTAINER_ID
     }
-
-
-def get_uptime() -> dict:
-    """
-    Расчет времени работы приложения
     
-    Returns:
-        dict: Время работы в секундах и человекочитаемом формате
-    """
-    delta = datetime.now(timezone.utc) - START_TIME
-    seconds = int(delta.total_seconds())
-    
-    # Преобразование в человекочитаемый формат
-    hours = seconds // 3600
-    minutes = (seconds % 3600) // 60
-    secs = seconds % 60
-    
-    human_format = ""
-    if hours > 0:
-        human_format += f"{hours} hour{'s' if hours != 1 else ''}"
-        if minutes > 0 or secs > 0:
-            human_format += ", "
-    if minutes > 0:
-        human_format += f"{minutes} minute{'s' if minutes != 1 else ''}"
-        if secs > 0:
-            human_format += ", "
-    if secs > 0 or (hours == 0 and minutes == 0):
-        human_format += f"{secs} second{'s' if secs != 1 else ''}"
-    
-    return {
-        'seconds': seconds,
-        'human': human_format
+    # Информация о времени
+    runtime_info = {
+        'uptime_seconds': get_uptime()['seconds'],
+        'uptime_human': get_uptime()['human'],
+        'current_time': datetime.now(timezone.utc).isoformat(),
+        'timezone': 'UTC',
+        'start_time': START_TIME.isoformat()
     }
-
-
-@app.route('/')
-def index():
-    """
-    Основной эндпоинт - информация о сервисе и системе
-    """
-    logger.info(f"Request from {request.remote_addr} to main endpoint")
+    
+    # Информация о запросе
+    request_info = {
+        'client_ip': request.remote_addr,
+        'user_agent': request.headers.get('User-Agent', 'Unknown'),
+        'method': request.method,
+        'path': request.path
+    }
     
     return jsonify({
         'service': {
             'name': 'devops-info-service',
-            'version': '1.0.0',
-            'description': 'DevOps course info service',
+            'version': '2.0.0',
+            'description': 'DevOps course info service (Dockerized)',
             'framework': 'Flask',
-            'environment': 'production' if not DEBUG else 'development'
+            'environment': 'docker' if IS_DOCKER else 'local'
         },
-        'system': get_system_info(),
-        'runtime': {
-            'uptime_seconds': get_uptime()['seconds'],
-            'uptime_human': get_uptime()['human'],
-            'current_time': datetime.now(timezone.utc).isoformat(),
-            'timezone': 'UTC',
-            'start_time': START_TIME.isoformat()
-        },
-        'request': {
-            'client_ip': request.remote_addr,
-            'user_agent': request.headers.get('User-Agent', 'Unknown'),
-            'method': request.method,
-            'path': request.path,
-            'headers': dict(request.headers)
-        },
+        'system': system_info,
+        'runtime': runtime_info,
+        'request': request_info,
         'endpoints': [
             {'path': '/', 'method': 'GET', 'description': 'Service information'},
-            {'path': '/health', 'method': 'GET', 'description': 'Health check'}
+            {'path': '/health', 'method': 'GET', 'description': 'Health check'},
+            {'path': '/docker', 'method': 'GET', 'description': 'Docker information'}
         ]
     })
 
-
 @app.route('/health')
-def health():
-    """
-    Эндпоинт проверки состояния сервиса
-    """
-    logger.debug(f"Health check from {request.remote_addr}")
-    
+def health_check():
+    """Эндпоинт проверки состояния сервиса"""
     return jsonify({
         'status': 'healthy',
         'timestamp': datetime.now(timezone.utc).isoformat(),
         'uptime_seconds': get_uptime()['seconds'],
-        'service': 'devops-info-service',
-        'version': '1.0.0'
-    }), 200
+        'environment': 'docker' if IS_DOCKER else 'local',
+        'container_id': CONTAINER_ID
+    })
 
+@app.route('/docker')
+def docker_info():
+    """Эндпоинт информации о Docker окружении"""
+    return jsonify({
+        'is_docker': IS_DOCKER,
+        'container_id': CONTAINER_ID,
+        'docker_env': dict(os.environ) if IS_DOCKER else None,
+        'message': 'Running in Docker container' if IS_DOCKER else 'Running locally'
+    })
 
 @app.errorhandler(404)
 def not_found(error):
-    """
-    Обработчик ошибки 404
-    """
+    """Обработка ошибки 404"""
     return jsonify({
         'error': 'Not Found',
-        'message': 'The requested endpoint does not exist',
-        'path': request.path,
+        'message': 'Endpoint does not exist',
         'available_endpoints': [
             {'path': '/', 'method': 'GET'},
-            {'path': '/health', 'method': 'GET'}
+            {'path': '/health', 'method': 'GET'},
+            {'path': '/docker', 'method': 'GET'}
         ]
     }), 404
 
-
-@app.errorhandler(500)
-def internal_error(error):
-    """
-    Обработчик ошибки 500
-    """
-    logger.error(f"Internal server error: {error}")
-    return jsonify({
-        'error': 'Internal Server Error',
-        'message': 'An unexpected error occurred',
-        'timestamp': datetime.now(timezone.utc).isoformat()
-    }), 500
-
-
-@app.before_request
-def log_request():
-    """
-    Логирование входящих запросов
-    """
-    logger.info(f"Incoming request: {request.method} {request.path} from {request.remote_addr}")
-
-
-@app.after_request
-def log_response(response):
-    """
-    Логирование исходящих ответов
-    """
-    logger.info(f"Response: {request.method} {request.path} - Status {response.status_code}")
-    return response
-
-
 if __name__ == '__main__':
-    logger.info(f"Starting DevOps Info Service on {HOST}:{PORT}")
-    logger.info(f"Debug mode: {DEBUG}")
+    print(f"Starting DevOps Info Service on {HOST}:{PORT}")
+    print(f"Debug mode: {DEBUG}")
+    print(f"Docker environment: {IS_DOCKER}")
+    print(f"Container ID: {CONTAINER_ID}")
     
-    app.run(
-        host=HOST,
-        port=PORT,
-        debug=DEBUG
-    )
+    app.run(host=HOST, port=PORT, debug=DEBUG)
