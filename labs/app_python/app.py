@@ -46,6 +46,23 @@ def get_uptime():
         'human': ', '.join(parts)
     }
 
+def get_system_info():
+    """Collect system information."""
+    import os
+    import socket
+    import platform
+    
+    return {
+        'hostname': socket.gethostname(),
+        'platform': platform.system(),
+        'platform_version': platform.version(),
+        'architecture': platform.machine(),
+        'cpu_count': os.cpu_count(),
+        'python_version': platform.python_version(),
+        'is_docker_container': os.path.exists('/.dockerenv'),
+        'container_id': socket.gethostname() if os.path.exists('/.dockerenv') else None
+    }
+
 @app.route('/')
 def main_endpoint():
     """Основной эндпоинт - информация о сервисе и системе"""
