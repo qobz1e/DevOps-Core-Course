@@ -1,1 +1,7 @@
-test
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfvars
+yc-key.json
+id_rsa
+id_rsa.pub
