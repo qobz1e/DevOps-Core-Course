@@ -1,6 +1,7 @@
 import pulumi
 import pulumi_yandex as yandex
 
+# Сеть
 network = yandex.VpcNetwork("lab-network")
 
 subnet = yandex.VpcSubnet(
@@ -10,6 +11,15 @@ subnet = yandex.VpcSubnet(
     v4_cidr_blocks=["10.0.0.0/24"]
 )
 
+# Добавляем SSH-ключ
+with open("/workspaces/DevOps-Core-Course/labs/id_rsa.pub") as f:
+    ssh_key = f.read().strip()
+
+metadata = {
+    "ssh-keys": f"ubuntu:{ssh_key}"
+}
+
+# VM
 vm = yandex.ComputeInstance(
     "lab-vm",
     resources={
@@ -26,7 +36,9 @@ vm = yandex.ComputeInstance(
     network_interfaces=[{
         "subnet_id": subnet.id,
         "nat": True
-    }]
+    }],
+    metadata=metadata
 )
 
+# Экспорт публичного IP
 pulumi.export("public_ip", vm.network_interfaces[0].nat_ip_address)
