@@ -1,10 +1,12 @@
+---
+# Web app configuration
+app_name: devops-app
 docker_image: qobz1e/devops-info-service
-docker_image_tag: lab2
-app_container_name: info-service
-app_port: 5000
-restart_policy: always
-env_vars:
-  ENV: production
+docker_tag: lab2
+app_port: 8000
+app_internal_port: 8000
+compose_project_dir: "/opt/{{ app_name }}"
+docker_compose_version: "3.8"
 dockerhub_username: qobz1e
 dockerhub_password: !vault |
           $ANSIBLE_VAULT;1.1;AES256
@@ -14,3 +16,4 @@ dockerhub_password: !vault |
           3337303165653736640a373561613836373639303237373032393134336464613732346161653664
           65396237363265336236623361326135346238613065656131656265353737323363303034343133
           6531623765633839623039323131666530646464306133373030
+web_app_wipe: false

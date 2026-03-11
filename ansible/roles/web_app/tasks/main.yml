@@ -1,0 +1,34 @@
+---
+# Include wipe logic first
+- name: Include wipe tasks
+  include_tasks: wipe.yml
+  tags:
+    - web_app_wipe
+
+# Deployment block
+- name: Deploy application with Docker Compose
+  block:
+    - name: Create app directory
+      file:
+        path: /opt/{{ app_name }}
+        state: directory
+        mode: '0755'
+
+    - name: Template docker-compose.yml
+      template:
+        src: docker-compose.yml.j2
+        dest: /opt/{{ app_name }}/docker-compose.yml
+
+    - name: Deploy with docker-compose
+      shell: docker compose up -d --build
+      args:
+        chdir: "/opt/{{ app_name }}"
+
+  rescue:
+    - name: Handle deployment failure
+      debug:
+        msg: "Deployment failed for {{ app_name }}"
+
+  tags:
+    - app_deploy
+    - compose
