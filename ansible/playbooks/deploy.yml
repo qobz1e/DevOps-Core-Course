@@ -1,8 +1,8 @@
 ---
-- name: Deploy application
-  hosts: webservers
-  become: yes
+- name: Deploy Web Application
+  hosts: all
+  become: true
   vars_files:
     - /workspaces/DevOps-Core-Course/ansible/group_vars/all.yml
   roles:
-    - app_deploy
+    - web_app
