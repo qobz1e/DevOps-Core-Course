@@ -184,12 +184,12 @@ All services should show `healthy`.
 ### 9.1 Logs from all containers
 
 * Grafana Explore query: `{job="docker"}`
-  ![All Docker logs](screenshots/all_logs.png)
+  ![All Docker logs](../screenshots/all_logs.png)
 
 ### 9.2 JSON logs from app-python
 
 * Grafana Explore query: `{app="devops-python"}`
-  ![App Python JSON logs](screenshots/app_logs.png)
+  ![App Python JSON logs](../screenshots/app_logs.png)
 
 ### 9.3 Dashboard
 
@@ -199,9 +199,9 @@ All services should show `healthy`.
   2. Requests per second
   3. Error Logs
   4. Log Levels
-     ![DevOps Logs Dashboard](screenshots/dashboard.png)
+     ![DevOps Logs Dashboard](../screenshots/dashboard.png)
 
 ### 9.4 Docker Compose status / Healthchecks
 
 * PowerShell command: `docker compose ps`
-  ![Docker Compose ps](screenshots/healthchecks.png)
+  ![Docker Compose ps](../screenshots/healthchecks.png)
