@@ -11,6 +11,12 @@ spec:
     metadata:
       labels:
         app: {{ include "myapp.name" . }}
+      annotations:
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/role: "myapp-role"
+        vault.hashicorp.com/agent-inject-secret-config: "secret/data/myapp"
+        vault.hashicorp.com/agent-inject-token: "true"
+        vault.hashicorp.com/agent-inject-address: "http://vault.default.svc:8200"
     spec:
       containers:
         - name: app
@@ -31,3 +37,7 @@ spec:
               port: {{ .Values.service.targetPort }}
             initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
             periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+          envFrom:
+            - secretRef:
+                name: {{ include "myapp.fullname" . }}-secret
+            
