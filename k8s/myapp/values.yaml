@@ -27,3 +27,7 @@ readinessProbe:
   path: /
   initialDelaySeconds: 5
   periodSeconds: 3
+
+secrets:
+  username: admin
+  password: secret123
