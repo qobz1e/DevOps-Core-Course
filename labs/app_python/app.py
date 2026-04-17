@@ -1,29 +1,27 @@
-"""
-DevOps Info Service
-Веб-сервис для предоставления информации о системе и состоянии сервиса
-"""
-
 import os
 import socket
 import platform
+import json
 from datetime import datetime, timezone
 from flask import Flask, jsonify, request
 
-# Prometheus
 from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
 
-# Создаем приложение Flask
 app = Flask(__name__)
 
-# Настройки из переменных окружения
 HOST = os.getenv('HOST', '0.0.0.0')
 PORT = int(os.getenv('PORT', 5000))
 DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
 
-# Время запуска сервиса
 START_TIME = datetime.now(timezone.utc)
 
-# Docker информация
+DATA_DIR = os.getenv("DATA_DIR", "/data")
+VISITS_FILE = os.path.join(DATA_DIR, "visits.json")
+
+CONFIG_PATH = "/config/config.json"
+
+os.makedirs(DATA_DIR, exist_ok=True)
+
 IS_DOCKER = os.path.exists('/.dockerenv')
 CONTAINER_ID = socket.gethostname() if IS_DOCKER else None
 
@@ -47,6 +45,31 @@ http_requests_in_progress = Gauge(
     'http_requests_in_progress',
     'Number of HTTP requests in progress'
 )
+
+# ----------------------------
+# DATA FUNCTIONS
+# ----------------------------
+
+def load_visits():
+    try:
+        with open(VISITS_FILE, "r") as f:
+            return json.load(f).get("visits", 0)
+    except:
+        return 0
+
+
+def save_visits(count):
+    os.makedirs(DATA_DIR, exist_ok=True)
+    with open(VISITS_FILE, "w") as f:
+        json.dump({"visits": count}, f)
+
+
+def load_config():
+    try:
+        with open(CONFIG_PATH, "r") as f:
+            return json.load(f)
+    except:
+        return {}
 
 # ----------------------------
 # HELPERS
@@ -107,62 +130,33 @@ def after_request(response):
 
 @app.route('/')
 def main_endpoint():
-    system_info = {
-        'hostname': socket.gethostname(),
-        'platform': platform.system(),
-        'platform_version': platform.version(),
-        'architecture': platform.machine(),
-        'cpu_count': os.cpu_count(),
-        'python_version': platform.python_version(),
-        'is_docker_container': IS_DOCKER,
-        'container_id': CONTAINER_ID
-    }
+    visits = load_visits()
+    visits += 1
+    save_visits(visits)
 
-    runtime_info = {
-        'uptime_seconds': get_uptime()['seconds'],
-        'uptime_human': get_uptime()['human'],
-        'current_time': datetime.now(timezone.utc).isoformat(),
-        'timezone': 'UTC',
-        'start_time': START_TIME.isoformat()
-    }
-
-    request_info = {
-        'client_ip': request.remote_addr,
-        'user_agent': request.headers.get('User-Agent', 'Unknown'),
-        'method': request.method,
-        'path': request.path
-    }
+    config = load_config()
 
     return jsonify({
         'service': {
             'name': 'devops-info-service',
             'version': '2.0.0',
-            'description': 'DevOps course info service (Dockerized)',
-            'framework': 'Flask',
-            'environment': 'docker' if IS_DOCKER else 'local'
+            'environment': config.get("environment", "unknown")
         },
-        'system': system_info,
-        'runtime': runtime_info,
-        'request': request_info
+        'visits': visits,
+        'config': config
+    })
+
+@app.route('/visits')
+def visits():
+    return jsonify({
+        "visits": load_visits()
     })
 
 @app.route('/health')
 def health_check():
     return jsonify({
         'status': 'healthy',
-        'timestamp': datetime.now(timezone.utc).isoformat(),
-        'uptime_seconds': get_uptime()['seconds'],
-        'environment': 'docker' if IS_DOCKER else 'local',
-        'container_id': CONTAINER_ID
-    })
-
-@app.route('/docker')
-def docker_info():
-    return jsonify({
-        'is_docker': IS_DOCKER,
-        'container_id': CONTAINER_ID,
-        'docker_env': dict(os.environ) if IS_DOCKER else None,
-        'message': 'Running in Docker container' if IS_DOCKER else 'Running locally'
+        'timestamp': datetime.now(timezone.utc).isoformat()
     })
 
 @app.route('/metrics')
@@ -170,24 +164,6 @@ def metrics():
     return generate_latest(), 200, {'Content-Type': CONTENT_TYPE_LATEST}
 
 # ----------------------------
-# ERRORS
-# ----------------------------
-
-@app.errorhandler(404)
-def not_found(error):
-    return jsonify({
-        'error': 'Not Found',
-        'message': 'Endpoint does not exist'
-    }), 404
-
-# ----------------------------
-# START
-# ----------------------------
 
 if __name__ == '__main__':
-    print(f"Starting DevOps Info Service on {HOST}:{PORT}")
-    print(f"Debug mode: {DEBUG}")
-    print(f"Docker environment: {IS_DOCKER}")
-    print(f"Container ID: {CONTAINER_ID}")
-
     app.run(host=HOST, port=PORT, debug=DEBUG)
