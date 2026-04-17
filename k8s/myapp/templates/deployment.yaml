@@ -12,32 +12,42 @@ spec:
       labels:
         app: {{ include "myapp.name" . }}
       annotations:
-        vault.hashicorp.com/agent-inject: "true"
-        vault.hashicorp.com/role: "myapp-role"
-        vault.hashicorp.com/agent-inject-secret-config: "secret/data/myapp"
-        vault.hashicorp.com/agent-inject-token: "true"
-        vault.hashicorp.com/agent-inject-address: "http://vault.default.svc:8200"
+        checksum/config: {{ include (print $.Template.BasePath "/configmap-file.yaml") . | sha256sum }}
     spec:
+      volumes:
+        - name: config-volume
+          configMap:
+            name: {{ include "myapp.fullname" . }}-config
+        - name: data-volume
+          persistentVolumeClaim:
+            claimName: {{ include "myapp.fullname" . }}-data
+
       containers:
         - name: app
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           ports:
             - containerPort: {{ .Values.service.targetPort }}
-          resources:
-            {{- toYaml .Values.resources | nindent 12 }}
+
+          envFrom:
+            - configMapRef:
+                name: {{ include "myapp.fullname" . }}-env
+
+          volumeMounts:
+            - name: config-volume
+              mountPath: /config
+            - name: data-volume
+              mountPath: /data
+
           livenessProbe:
             httpGet:
-              path: {{ .Values.livenessProbe.path }}
+              path: /
               port: {{ .Values.service.targetPort }}
-            initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
-            periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+            initialDelaySeconds: 10
+            periodSeconds: 5
+
           readinessProbe:
             httpGet:
-              path: {{ .Values.readinessProbe.path }}
+              path: /
               port: {{ .Values.service.targetPort }}
-            initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
-            periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
-          envFrom:
-            - secretRef:
-                name: {{ include "myapp.fullname" . }}-secret
-            
+            initialDelaySeconds: 5
+            periodSeconds: 3
