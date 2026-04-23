@@ -1,0 +1,21 @@
+replicaCount: 1
+
+image:
+  repository: qobz1e/devops-info-service
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: NodePort
+  port: 80
+  targetPort: 5000
+
+persistence:
+  enabled: true
+  size: 100Mi
+
+environment: dev
+
+secrets:
+  username: admin
+  password: secret123
